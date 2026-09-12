@@ -20,6 +20,6 @@ export async function POST(request: Request) {
   try { return Response.json({ text: await respondToMessage(input) }); }
   catch (error) {
     const missing = error instanceof Error && error.message === 'MODEL_NOT_CONFIGURED';
-    return Response.json({ error: missing ? 'Configura MODEL_ID y AI_GATEWAY_API_KEY en Vercel.' : 'No se pudo completar la ejecución. Intenta nuevamente; no se modificaron sistemas externos.' }, { status: missing ? 503 : 502 });
+    return Response.json({ error: missing ? 'Configura MODEL_ID y acceso a AI Gateway mediante la identidad de Vercel o AI_GATEWAY_API_KEY.' : 'No se pudo completar la ejecución. Intenta nuevamente; no se modificaron sistemas externos.' }, { status: missing ? 503 : 502 });
   }
 }

@@ -8,11 +8,16 @@ Configurar `REDIS_URL` con una conexión Redis/TLS compatible con el cliente Nod
 
 ### Slack
 
-1. Crear una app de Slack con un bot e instalarla en el workspace de demostración.
-2. Configurar `SLACK_BOT_TOKEN` y `SLACK_SIGNING_SECRET` en Vercel.
-3. Establecer la Events Request URL en `https://DOMINIO/api/webhooks/slack`.
-4. Conceder `app_mentions:read`, `chat:write`, `channels:history`, `im:history`, `users:read`; suscribir `app_mention`, `message.channels` y `message.im`. Para canales privados, añadir `groups:history` y `message.groups` si se van a usar.
-5. Reinstalar la app tras cambiar permisos e invitar el bot al canal. Mencionarlo con la descripción del proceso y responder en el mismo hilo.
+Se necesita el enlace del workspace de Slack y una cuenta que pueda crear e instalar aplicaciones allí (o la aprobación de su administrador). El acceso a GitHub/Vercel no concede esos permisos en Slack. También hay que elegir un canal público de prueba al que invitar el bot; los DM con la app están habilitados.
+
+1. Abrir [Slack Apps](https://api.slack.com/apps), elegir **Create New App → From a manifest**, seleccionar el workspace e importar [slack-manifest.json](./slack-manifest.json).
+2. Si Slack exige verificar el endpoint antes de guardar, importar inicialmente sin `settings.event_subscriptions` y agregar esa sección después del paso 4. El webhook devuelve 503 mientras faltan Redis o las credenciales de Slack.
+3. En **OAuth & Permissions**, instalar la app en el workspace. Guardar **Bot User OAuth Token** (`xoxb-…`) como `SLACK_BOT_TOKEN` en las variables de producción de Vercel. En **Basic Information → App Credentials**, guardar **Signing Secret** como `SLACK_SIGNING_SECRET`. No pegar estos valores en el chat ni guardarlos en archivos del repositorio.
+4. Comprobar que producción tiene `REDIS_URL` y el proveedor de modelos configurados y hacer un nuevo despliegue para aplicar las variables.
+5. En **Event Subscriptions**, habilitar los eventos y verificar `https://agentic-process-optimizer.vercel.app/api/webhooks/slack`. Usar los tres eventos del manifiesto: `app_mention`, `message.channels` y `message.im`.
+6. Invitar `process-optimizer` al canal de prueba. Mencionarlo con la descripción de un proceso y responder en el mismo hilo sin volver a mencionarlo. Probar además un DM y `borrar contexto`. No dar por conectada la integración hasta observar respuestas reales con el contexto esperado.
+
+El manifiesto concede `app_mentions:read` para menciones, `chat:write` para responder, `channels:history` para recibir continuaciones en canales públicos donde está invitado, `im:history` para mensajes directos y `users:read` para la identificación de autores/bots del adaptador. No solicita lectura de archivos, correo de usuarios, reacciones, comandos ni canales privados. El agente usa su contexto de Redis; no recorre el historial completo del workspace. Para una prueba en canal privado, agregar explícitamente `groups:history` y `message.groups`, reinstalar e invitar el bot. Reinstalar también después de cualquier cambio de permisos.
 
 El adaptador oficial verifica la firma HMAC del webhook. Esta versión configura una instalación por plataforma; no implementa un flujo OAuth de instalación pública para múltiples organizaciones.
 
