@@ -24,7 +24,8 @@ Las cifras de impacto deben señalar moneda, período, supuestos y si son declar
 Termina con el siguiente paso concreto. No digas que el agente está conectado, desplegado o midiendo sin evidencia. Los informes deben incluir proceso, fuentes, datos pendientes, recomendación, impacto y controles.`;
 
 export async function respondToMessage({ text, history }: { text: string; history: ConversationMessage[] }): Promise<string> {
-  if (!process.env.MODEL_ID || !(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN)) {
+  // The SDK resolves Vercel OIDC from request context as well as environment.
+  if (!process.env.MODEL_ID) {
     throw new Error('MODEL_NOT_CONFIGURED');
   }
   const messages = [...history.slice(-20), { role: 'user' as const, content: text }];

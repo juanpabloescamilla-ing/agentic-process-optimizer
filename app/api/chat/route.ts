@@ -19,6 +19,7 @@ export async function POST(request: Request) {
   catch { return Response.json({ error: 'Mensaje o historial inválido.' }, { status: 400 }); }
   try { return Response.json({ text: await respondToMessage(input) }); }
   catch (error) {
+    console.error('agent_request_failed', { name: error instanceof Error ? error.name : 'UnknownError', status: error && typeof error === 'object' && 'statusCode' in error ? error.statusCode : undefined });
     const missing = error instanceof Error && error.message === 'MODEL_NOT_CONFIGURED';
     return Response.json({ error: missing ? 'Configura MODEL_ID y acceso a AI Gateway mediante la identidad de Vercel o AI_GATEWAY_API_KEY.' : 'No se pudo completar la ejecución. Intenta nuevamente; no se modificaron sistemas externos.' }, { status: missing ? 503 : 502 });
   }
