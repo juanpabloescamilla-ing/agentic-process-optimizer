@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { respondToMessage } from '@/src/agent/respond';
+import { agentFailure } from '@/src/agent/errors';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -19,8 +20,9 @@ export async function POST(request: Request) {
   catch { return Response.json({ error: 'Mensaje o historial inválido.' }, { status: 400 }); }
   try { return Response.json({ text: await respondToMessage(input) }); }
   catch (error) {
-    console.error('agent_request_failed', { name: error instanceof Error ? error.name : 'UnknownError', status: error && typeof error === 'object' && 'statusCode' in error ? error.statusCode : undefined });
+    const failure = agentFailure(error);
+    console.error('agent_request_failed', { names: failure.names, statuses: failure.statuses });
     const missing = error instanceof Error && error.message === 'MODEL_NOT_CONFIGURED';
-    return Response.json({ error: missing ? 'Configura MODEL_ID y acceso a AI Gateway mediante la identidad de Vercel o AI_GATEWAY_API_KEY.' : 'No se pudo completar la ejecución. Intenta nuevamente; no se modificaron sistemas externos.' }, { status: missing ? 503 : 502 });
+    return Response.json({ error: missing ? 'Configura MODEL_ID y acceso a AI Gateway mediante la identidad de Vercel o AI_GATEWAY_API_KEY.' : failure.message }, { status: missing ? 503 : failure.status });
   }
 }
