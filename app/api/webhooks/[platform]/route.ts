@@ -12,7 +12,7 @@ export async function POST(request: Request, context: { params: Promise<{ platfo
   }
   // Pass the untouched request to the official adapter: Slack HMAC / Teams JWT
   // verification must happen before any event reaches our agent handlers.
-  const bot = getChannelBot(platform);
+  const bot = await getChannelBot(platform);
   return bot.webhooks[platform](request, {
     waitUntil: (task) => after(async () => { await task; }),
   });

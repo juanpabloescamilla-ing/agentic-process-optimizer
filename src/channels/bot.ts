@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { Chat, type Adapter, type Message, type Thread } from "chat";
 import { createSlackAdapter } from "@chat-adapter/slack";
-import { createTeamsAdapter } from "@chat-adapter/teams";
 import { createRedisState } from "@chat-adapter/state-redis";
+import { connectSlackAdapter } from "@vercel/connect/chat";
 import { respondToMessage } from "@/src/agent/respond";
 
 export type Platform = "slack" | "teams";
@@ -19,9 +19,32 @@ export function isPlatform(value: string): value is Platform {
 
 export function missingChannelConfiguration(platform: Platform): string[] {
   const required = platform === "slack"
-    ? ["REDIS_URL", "SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET"]
+    ? process.env.SLACK_CONNECTOR?.trim()
+      ? ["REDIS_URL"]
+      : ["REDIS_URL", "SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET"]
     : ["REDIS_URL", "TEAMS_APP_ID", "TEAMS_APP_PASSWORD", "TEAMS_APP_TENANT_ID"];
   return required.filter((name) => !process.env[name]?.trim());
+}
+
+/** Connect supplies both short-lived credentials and an OIDC webhook verifier. */
+export function slackAdapterConfiguration() {
+  const connector = process.env.SLACK_CONNECTOR?.trim();
+  if (connector) return connectSlackAdapter(connector);
+  return {
+    botToken: process.env.SLACK_BOT_TOKEN!,
+    signingSecret: process.env.SLACK_SIGNING_SECRET!,
+  };
+}
+
+export function channelStatePrefix(platform: Platform): string {
+  const connector = process.env.SLACK_CONNECTOR?.trim();
+  const installation = platform === "slack"
+    ? connector
+      ? `connect:${process.env.VERCEL_PROJECT_ID ?? "local"}:${connector}:${process.env.SLACK_WORKSPACE_ID ?? ""}`
+      : process.env.SLACK_BOT_TOKEN!
+    : `${process.env.TEAMS_APP_TENANT_ID}:${process.env.TEAMS_APP_ID}`;
+  const installationId = createHash("sha256").update(installation).digest("hex").slice(0, 24);
+  return `process-optimizer:${platform}:${installationId}`;
 }
 
 async function answer(thread: Thread<ConversationState>, message: Message, skipped: Message[] = []) {
@@ -54,31 +77,26 @@ async function answer(thread: Thread<ConversationState>, message: Message, skipp
 }
 
 /** One configured installation per platform; history never joins Slack and Teams. */
-export function getChannelBot(platform: Platform) {
+export async function getChannelBot(platform: Platform) {
   const missing = missingChannelConfiguration(platform);
   if (missing.length) throw new Error(`Channel configuration missing: ${missing.join(", ")}`);
   const existing = bots.get(platform);
   if (existing) return existing;
 
   const adapter: Adapter = platform === "slack"
-    ? createSlackAdapter({
-        botToken: process.env.SLACK_BOT_TOKEN!,
-        signingSecret: process.env.SLACK_SIGNING_SECRET!,
-      })
-    : createTeamsAdapter({
+    ? createSlackAdapter(slackAdapterConfiguration())
+    : (await import("@chat-adapter/teams")).createTeamsAdapter({
         appId: process.env.TEAMS_APP_ID!,
         appPassword: process.env.TEAMS_APP_PASSWORD!,
         appTenantId: process.env.TEAMS_APP_TENANT_ID!,
         appType: "SingleTenant",
       });
   // Installation-specific Redis namespace prevents reuse after a tenant switch.
-  // Only the digest is used in keys; the Slack token itself is never persisted.
-  const installation = platform === "slack" ? process.env.SLACK_BOT_TOKEN! : `${process.env.TEAMS_APP_TENANT_ID}:${process.env.TEAMS_APP_ID}`;
-  const installationId = createHash("sha256").update(installation).digest("hex").slice(0, 24);
+  // Connect namespaces use the stable connector identity, never its rotating token.
   const bot = new Chat<Record<string, Adapter>, ConversationState>({
     userName: "process-optimizer",
     adapters: { [platform]: adapter },
-    state: createRedisState({ url: process.env.REDIS_URL!, keyPrefix: `process-optimizer:${platform}:${installationId}` }),
+    state: createRedisState({ url: process.env.REDIS_URL!, keyPrefix: channelStatePrefix(platform) }),
     logger: "error",
     concurrency: "queue",
   });

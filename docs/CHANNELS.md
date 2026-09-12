@@ -8,6 +8,18 @@ Configurar `REDIS_URL` con una conexión Redis/TLS compatible con el cliente Nod
 
 ### Slack
 
+#### Vercel Connect (instalación `slack/okflow`)
+
+Configurar `SLACK_CONNECTOR=slack/okflow` y `REDIS_URL`. No se requieren `SLACK_BOT_TOKEN` ni `SLACK_SIGNING_SECRET` en este modo. El adaptador recibe `connectSlackAdapter()` de `@vercel/connect/chat`: obtiene credenciales temporales para las respuestas y verifica el bearer OIDC que añade Vercel a los webhooks reenviados. No acepta directamente la firma nativa de Slack en este modo.
+
+El conector debe estar vinculado al proyecto y entorno correctos **con triggers habilitados**, apuntando a `/api/webhooks/slack`. Vercel verifica primero la firma de Slack y el helper verifica después el token OIDC del reenvío contra las claves de Vercel, el proyecto y el entorno de despliegue. El helper exige `VERCEL_PROJECT_ID` y `VERCEL_TARGET_ENV` o `VERCEL_ENV`; si faltan, rechaza las solicitudes. No basta con conectar la cuenta para activar la entrega de eventos. El endpoint no incorpora un bypass de autenticación.
+
+El namespace de Redis usa el proyecto y el identificador estable del conector, por lo que la rotación de sus tokens no borra la conversación. Cada conector corresponde a la instalación configurada. Se puede fijar `SLACK_WORKSPACE_ID` para separar explícitamente el estado si se vuelve a vincular el mismo conector a otro workspace; modificarlo inicia un contexto nuevo.
+
+#### Token de bot (alternativa sin Connect)
+
+Dejar `SLACK_CONNECTOR` sin configurar para usar el modo de firma HMAC original:
+
 Se necesita el enlace del workspace de Slack y una cuenta que pueda crear e instalar aplicaciones allí (o la aprobación de su administrador). El acceso a GitHub/Vercel no concede esos permisos en Slack. También hay que elegir un canal público de prueba al que invitar el bot; los DM con la app están habilitados.
 
 1. Abrir [Slack Apps](https://api.slack.com/apps), elegir **Create New App → From a manifest**, seleccionar el workspace e importar [slack-manifest.json](./slack-manifest.json).
@@ -19,7 +31,7 @@ Se necesita el enlace del workspace de Slack y una cuenta que pueda crear e inst
 
 El manifiesto concede `app_mentions:read` para menciones, `chat:write` para responder, `channels:history` para recibir continuaciones en canales públicos donde está invitado, `im:history` para mensajes directos y `users:read` para la identificación de autores/bots del adaptador. No solicita lectura de archivos, correo de usuarios, reacciones, comandos ni canales privados. El agente usa su contexto de Redis; no recorre el historial completo del workspace. Para una prueba en canal privado, agregar explícitamente `groups:history` y `message.groups`, reinstalar e invitar el bot. Reinstalar también después de cualquier cambio de permisos.
 
-El adaptador oficial verifica la firma HMAC del webhook. Esta versión configura una instalación por plataforma; no implementa un flujo OAuth de instalación pública para múltiples organizaciones.
+El adaptador oficial verifica la firma HMAC del webhook en este modo. Esta versión configura una instalación por plataforma; no implementa un flujo OAuth de instalación pública para múltiples organizaciones.
 
 ### Teams
 
@@ -45,3 +57,4 @@ Se usa `createTeamsAdapter`, cuyo pipeline autentica Bot Framework; no se utiliz
 - [Adaptador oficial de Slack](https://chat-sdk.dev/adapters/official/slack)
 - [Adaptador oficial de Teams](https://chat-sdk.dev/adapters/official/teams)
 - [Adaptador Redis](https://chat-sdk.dev/adapters/official/redis)
+- [Vercel Connect con Chat SDK y verificación OIDC](https://vercel.com/docs/connect/frameworks/chat-sdk)
