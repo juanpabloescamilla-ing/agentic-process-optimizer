@@ -1,5 +1,6 @@
 import { generateText, stepCountIs, tool } from 'ai';
 import { configuredModel } from './model';
+import { reportInputSchema, saveReport, reportUrl } from '../reports/store';
 import { z } from 'zod';
 import { diagnoseProcess } from '../core';
 import { processSchema, assumptionsSchema } from './schemas';
@@ -16,7 +17,7 @@ Cita fragmentos exactos aportados por el usuario. Una declaración del usuario e
 Usa diagnose para calcular y clasificar, no hagas aritmética mental. Haz una sola pregunta breve por turno y no vuelvas a pedir datos que ya te dieron.
 No equipares tiempo automático a esfuerzo humano ni horas liberadas a reducción de nómina.
 Antes de ejecutar clasificación, presenta las reglas y los registros propuestos, y pide al usuario que solicite ejecutarlos.
-Las herramientas disponibles solo consultan datos públicos o transforman registros aportados: no envían ofertas ni modifican sistemas externos.
+Las herramientas consultan datos públicos, transforman registros aportados y guardan reportes del diagnóstico. No envían ofertas ni modifican los sistemas de la empresa.
 Cuando el usuario solicite implementar, puedes ejecutar una clasificación con reglas explícitas o consultar SECOP y generar una matriz.
 Explica qué ejecutaste realmente, qué queda manual y qué herramientas adicionales requiere la intervención.
 Si no existe herramienta para implementar una recomendación, dilo y entrega una especificación, nunca afirmes haberla instalado.
@@ -32,7 +33,12 @@ Evita palabras como optimización, intervención, evidencia, registros, capacida
 No muestres nombres de herramientas, campos del código, null, JSON ni detalles de conexión salvo que el usuario pida ayuda técnica. Si falta un dato, di que aún no lo sabes y pregunta solo el dato más importante para avanzar.
 Primero explica qué significa el resultado para la persona. Mantén cifras, moneda y período. Distingue una estimación de una medición con "si se cumple este supuesto" o "esto es una estimación; falta probarlo".
 Nunca confundas tiempo disponible con dinero ahorrado: "Tendrían 40 horas al mes para otras tareas. Eso no significa gastar menos en salarios." Si el ahorro neto es negativo, di "Gastarían 30.000 pesos más al mes", no solo "ahorro neto: -30.000".
-No copies el lenguaje técnico de respuestas anteriores del historial; aplica este estilo también al continuar un hilo existente.`;
+No copies el lenguaje técnico de respuestas anteriores del historial; aplica este estilo también al continuar un hilo existente.
+REPORTES INTERACTIVOS:
+Cuando pidan un reporte, informe, diagnóstico visual o algo tipo ANEI, usa createReport con los datos del hilo. No lo reemplaces por una tabla de texto. Si faltan cifras, usa null y genera un reporte parcial sin inventarlas. Solo pregunta antes si falta identificar el proceso o la moneda; no vuelvas a pedir datos ya presentes.
+El reporte guarda un diagnóstico y permite probar escenarios en el navegador. Los cambios del simulador no implementan mejoras ni modifican el reporte guardado. Incluye pasos concretos propuestos, no acciones supuestamente realizadas.
+Tras crearlo, responde con un resumen breve y el enlace exacto devuelto por la herramienta: [Abrir mi diagnóstico](url). Aclara que quien tenga el enlace puede verlo y que vence en 30 días. No inventes enlaces ni afirmes que creaste un reporte si la herramienta falló.
+En Slack evita tablas hechas con caracteres o Markdown: usa frases y viñetas; para comparaciones extensas genera el reporte interactivo.`;
 
 export async function respondToMessage({ text, history }: { text: string; history: ConversationMessage[] }): Promise<string> {
   // The SDK resolves Vercel OIDC from request context as well as environment.
@@ -41,6 +47,7 @@ export async function respondToMessage({ text, history }: { text: string; histor
   }
   const messages = [...history.slice(-20), { role: 'user' as const, content: text }];
   const userEvidence = messages.filter(m => m.role === 'user').map(m => m.content);
+  const reportLinks: string[] = [];
   const result = await generateText({
     model: configuredModel(),
     system: instructions,
@@ -49,6 +56,22 @@ export async function respondToMessage({ text, history }: { text: string; histor
     abortSignal: AbortSignal.timeout(45000),
     maxOutputTokens: 2500,
     tools: {
+      createReport: tool({
+        description: 'Guarda y publica un diagnóstico interactivo a petición del usuario. Usa solo datos conocidos y fragmentos exactos del usuario. Desconocidos null. Devuelve un enlace con acceso para quien lo posea, válido 30 días.',
+        inputSchema: reportInputSchema,
+        execute: async input => {
+          try {
+            const report = await saveReport(input, userEvidence);
+            const url = reportUrl(report.id);
+            reportLinks.push(url);
+            return { status: 'created', url, expiresAt: report.expiresAt, access: 'Cualquier persona con el enlace puede verlo. Los escenarios editados no cambian el original.' };
+          } catch (error) {
+            return { error: error instanceof Error && error.message === 'REPORT_EVIDENCE_MISSING'
+              ? 'Usa al menos un fragmento literal de los mensajes del usuario.'
+              : 'No se pudo guardar el reporte. No anuncies éxito ni inventes un enlace.' };
+          }
+        },
+      }),
       diagnose: tool({
         description: 'Diagnostica un proceso de cualquier sector y calcula impacto con hechos conocidos. Cada fragmento debe existir literalmente en los mensajes del usuario.',
         inputSchema: z.object({ process: processSchema, assumptions: assumptionsSchema }),
@@ -75,5 +98,7 @@ export async function respondToMessage({ text, history }: { text: string; histor
       }),
     },
   });
-  return result.text || 'La ejecución no produjo un informe final. Reformula la solicitud o reduce el número de registros.';
+  let response = result.text || 'La ejecución no produjo un informe final. Reformula la solicitud o reduce el número de registros.';
+  for (const url of reportLinks) if (!response.includes(url)) response += `\n\n[Abrir mi diagnóstico](${url}) — acceso para quien tenga el enlace; vence en 30 días.`;
+  return response;
 }

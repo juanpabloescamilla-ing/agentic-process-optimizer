@@ -84,3 +84,9 @@ Los casos cubren sectores distintos, falta de datos, ambigüedad y ahorro negati
 - [SECOP II](https://www.datos.gov.co/w/p6dx-8zbt/dneh-mcp2)
 
 Los ejemplos ANEI son referencias privadas de diseño y no se incluyen en este repositorio.
+
+## Reportes interactivos
+
+Pide en Slack "Genera un reporte interactivo con lo que ya te conté". La herramienta guarda una instantánea en Redis y devuelve un enlace de 256 bits, válido 30 días. Cualquier persona con el enlace puede verlo; no incluye autenticación individual ni aparece en un listado público. La página lleva noindex y no-referrer. Configurar REPORT_BASE_URL con el dominio público de producción.
+
+El reporte incluye datos aportados, recomendación, pasos propuestos y un simulador de tiempos/costos. Reutiliza calculateImpact; los datos faltantes quedan pendientes y el valor del tiempo no se presenta como ahorro en dinero. Las ediciones son escenarios locales estimados: restablecer recupera el original y recargar descarta cambios. Imprimir permite guardar el escenario como PDF desde el navegador. No ejecuta una automatización ni convierte estimaciones en mediciones. Los fragmentos del chat se identifican como declaraciones, aunque el usuario diga haberlos medido.
