@@ -1,4 +1,5 @@
 import { generateText, stepCountIs, tool } from 'ai';
+import { configuredModel } from './model';
 import { z } from 'zod';
 import { diagnoseProcess } from '../core';
 import { processSchema, assumptionsSchema } from './schemas';
@@ -31,7 +32,7 @@ export async function respondToMessage({ text, history }: { text: string; histor
   const messages = [...history.slice(-20), { role: 'user' as const, content: text }];
   const userEvidence = messages.filter(m => m.role === 'user').map(m => m.content);
   const result = await generateText({
-    model: process.env.MODEL_ID,
+    model: configuredModel(),
     system: instructions,
     messages,
     stopWhen: stepCountIs(5),

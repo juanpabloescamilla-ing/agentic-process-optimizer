@@ -28,7 +28,7 @@
   },
   "settings": {
     "event_subscriptions": {
-      "request_url": "https://agentic-process-optimizer.vercel.app/api/webhooks/slack",
+      "request_url": "https://agentic-process-optimizer-p4w9.vercel.app/api/webhooks/slack",
       "bot_events": ["app_mention", "message.channels", "message.im"]
     },
     "org_deploy_enabled": false,

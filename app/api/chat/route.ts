@@ -23,6 +23,6 @@ export async function POST(request: Request) {
     const failure = agentFailure(error);
     console.error('agent_request_failed', { names: failure.names, statuses: failure.statuses });
     const missing = error instanceof Error && error.message === 'MODEL_NOT_CONFIGURED';
-    return Response.json({ error: missing ? 'Configura MODEL_ID y acceso a AI Gateway mediante la identidad de Vercel o AI_GATEWAY_API_KEY.' : failure.message }, { status: missing ? 503 : failure.status });
+    return Response.json({ error: missing ? 'Configura MODEL_ID y OPENROUTER_API_KEY, o acceso a AI Gateway.' : failure.message }, { status: missing ? 503 : failure.status });
   }
 }

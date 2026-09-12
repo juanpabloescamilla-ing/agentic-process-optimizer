@@ -23,7 +23,7 @@ El núcleo solo conoce procesos, evidencia, volumen, esfuerzo, reglas, calidad d
 
 - Clasificación de intervenciones: agente, reglas, preparación de datos o control humano.
 - Preguntas por datos faltantes y cálculo determinista; desconocido no equivale a cero.
-- Orquestador con herramientas mediante AI SDK y modelo configurable en Vercel AI Gateway.
+- Orquestador con herramientas mediante AI SDK y modelo configurable en OpenRouter o Vercel AI Gateway.
 - Ejecución de reglas sobre registros aportados, con coincidencias, ambigüedades y pendientes.
 - Consulta pública SECOP II con URL, momento de consulta y duración del sistema.
 - Adaptadores Slack/Teams mediante Chat SDK, estado Redis y consola protegida con token.
@@ -45,7 +45,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Configurar `MODEL_ID` con un modelo habilitado en AI Gateway, `AI_GATEWAY_API_KEY` y `CONSOLE_ACCESS_TOKEN`. No hay modelo predeterminado ni datos simulados presentados como ejecución real. El token se introduce en «Acceso a la consola» y no se guarda en localStorage.
+Para OpenRouter, configurar `OPENROUTER_API_KEY` y `MODEL_ID` con un modelo que soporte herramientas (por ejemplo `openai/gpt-4.1-mini`). Cuando existe esa clave, el servidor usa OpenRouter directamente, sin AI Gateway. Sin ella, se conserva AI Gateway mediante `AI_GATEWAY_API_KEY` o la identidad de Vercel. Configurar también `CONSOLE_ACCESS_TOKEN`. No hay modelo predeterminado ni datos simulados presentados como ejecución real. El token se introduce en «Acceso a la consola» y no se guarda en localStorage.
 
 Para Slack y Teams: [instrucciones de conexión](docs/CHANNELS.md). Nunca subir `.env` al repositorio.
 
